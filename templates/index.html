@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Grafico de barras</title>
+  </head>
+  <body>
+    <div>
+      <h1>Top X de IPs de origen más problemáticas</h1>
+      <form action="/ips" method="post">
+        <label for="x">Número de elementos:</label>
+        <input type="text" name="x" id="x">
+        <input type="submit" value="Generar gráfico">
+      </form>
+    </div>
+    <div>
+      <h1>Top X de dispositivos más vulnerables</h1>
+      <form action="/devices" method="post">
+        <label for="x">Número de elementos:</label>
+        <input type="text" name="nDevices" id="nDevices">
+        <input type="submit" value="Generar gráfico">
+      </form>
+    </div>
+
+  </body>
+</html>
