@@ -3,7 +3,6 @@ import sqlite3
 import matplotlib.pyplot as plt
 import io
 import pandas as pd
-import seaborn as sns
 from flask import Flask, jsonify, render_template, request
 import requests
 
@@ -28,7 +27,7 @@ def top_ips():
 
 @app.route('/top_devices', methods=['GET'])
 def top_devices():
-    n = int(request.args.get('n_devices', 10))  # Top 10 devices by default
+    n = int(request.args.get('n_devices', 5))
     con = sqlite3.connect('database.db')
     dispositivos = pd.read_sql_query("SELECT * FROM dispositivos", con)
     analisis = pd.read_sql_query("SELECT * FROM analisis", con)

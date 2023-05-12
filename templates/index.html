@@ -29,9 +29,22 @@
           </div>
         </div>
       </div>
+      <div class="w-full mb-4">
+          <div class="bg-white rounded-lg shadow p-5">
+            <h2 class="text-2xl mb-4 text-gray-700">Top Dispositivos</h2>
+            <!-- Slider para seleccionar el número de elementos a mostrar -->
+            <div class="my-4">
+              <label for="num_devices" class="block text-gray-700 text-sm font-bold mb-2">Número de dispositivos a mostrar: <span id="num_devices_val">5</span>
+              </label>
+              <input type="range" id="num_devices" name="num_devices" min="1" max="10" value="5" class="slider bg-gray-300 appearance-none h-3 rounded-full w-full overflow-hidden cursor-pointer">
+            </div>
+            <canvas id="top_devices_chart"></canvas>
+          </div>
+        </div>
     </div>
     <script>
-      var chart;
+      var ipsChart;
+      var devicesChart;
 
       function updateTopIps(n_ips) {
         axios.get('/top_ips', {
@@ -39,13 +52,27 @@
             n_ips: n_ips
           }
         }).then(function(response) {
-          chart.data.labels = response.data.top_ips.map(function(ip) {
+          ipsChart.data.labels = response.data.top_ips.map(function(ip) {
             return ip.origen;
           });
-          chart.data.datasets[0].data = response.data.top_ips.map(function(ip) {
+          ipsChart.data.datasets[0].data = response.data.top_ips.map(function(ip) {
             return ip.count;
           });
-          chart.update();
+          ipsChart.update();
+        }).catch(function(error) {
+          console.log(error);
+        });
+      }
+
+      function updateTopDevices(n_devices) {
+        axios.get('/top_devices', {
+          params: {
+            n_devices: n_devices
+          }
+        }).then(function(response) {
+          devicesChart.data.labels = response.data.top_devices.ip;
+          devicesChart.data.datasets[0].data = response.data.top_devices.suma_vuln;
+          devicesChart.update();
         }).catch(function(error) {
           console.log(error);
         });
@@ -62,21 +89,59 @@
           console.log(error);
         });
       }
-      var slider = document.getElementById('num_ips');
-      var output = document.getElementById('num_ips_val');
-      slider.addEventListener('input', function(e) {
-        output.textContent = e.target.value;
+      var ipsSlider = document.getElementById('num_ips');
+      var ipsOutput = document.getElementById('num_ips_val');
+
+      var devicesSlider = document.getElementById('num_devices');
+      var devicesOutput = document.getElementById('num_devices_val');
+
+      ipsSlider.addEventListener('input', function(e) {
+        ipsOutput.textContent = e.target.value;
         updateTopIps(e.target.value);
       });
+
+      devicesSlider.addEventListener('input', function(e) {
+        devicesOutput.textContent = e.target.value;
+        updateTopDevices(e.target.value);
+      });
+
       setInterval(function() {
-        var n_ips = slider.value;
+        var n_ips = ipsSlider.value;
+        var n_devices = devicesSlider.value;
         updateTopIps(n_ips);
+        updateTopDevices(n_devices);
         updateLatestCVEs();
       }, 30000); //5 mins
 
+      axios.get('/top_devices').then(function(response) {
+        var devicesCtx = document.getElementById('top_devices_chart').getContext('2d');
+        devicesChart = new Chart(devicesCtx, {
+          type: 'bar',
+          data: {
+            labels: response.data.top_devices.ip,
+            datasets: [{
+              label: 'Top Devices',
+              data: response.data.top_devices.suma_vuln,
+              backgroundColor: 'rgba(75, 192, 192, 0.2)',
+              borderColor: 'rgba(75, 192, 192, 1)',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+      }).catch(function(error) {
+        console.log(error);
+      });
+
       axios.get('/top_ips').then(function(response) {
-        var ctx = document.getElementById('top_ips_chart').getContext('2d');
-        chart = new Chart(ctx, {
+        var ipsCtx = document.getElementById('top_ips_chart').getContext('2d');
+        ipsChart = new Chart(ipsCtx, {
           type: 'bar',
           data: {
             labels: response.data.top_ips.map(function(ip) {
