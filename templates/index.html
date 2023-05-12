@@ -1,25 +1,109 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Grafico de barras</title>
+    <title>Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css" rel="stylesheet">
   </head>
-  <body>
-    <div>
-      <h1>Top X de IPs de origen más problemáticas</h1>
-      <form action="/ips" method="post">
-        <label for="x">Número de elementos:</label>
-        <input type="text" name="x" id="x">
-        <input type="submit" value="Generar gráfico">
-      </form>
+  <body class="bg-gray-100">
+    <div class="container mx-auto p-5">
+      <h1 class="text-4xl mb-5 text-center text-gray-800">Dashboard</h1>
+      <div class="flex flex-wrap lg:flex-nowrap">
+        <div class="w-full lg:w-1/4 lg:mr-5 mb-4">
+          <div class="bg-white rounded-lg shadow p-5">
+            <h2 class="text-2xl mb-4 text-gray-700">Latest CVEs</h2>
+            <ul id="latest_cves_list" class="list-disc list-inside truncate"></ul>
+          </div>
+        </div>
+        <div class="w-full lg:w-3/4 mb-4">
+          <div class="bg-white rounded-lg shadow p-5">
+            <h2 class="text-2xl mb-4 text-gray-700">Top IPs</h2>
+            <!-- Slider para seleccionar el número de elementos a mostrar -->
+            <div class="my-4">
+              <label for="num_ips" class="block text-gray-700 text-sm font-bold mb-2">Número de IPs a mostrar: <span id="num_ips_val">5</span>
+              </label>
+              <input type="range" id="num_ips" name="num_ips" min="1" max="10" value="5" class="slider bg-gray-300 appearance-none h-3 rounded-full w-full overflow-hidden cursor-pointer">
+            </div>
+            <canvas id="top_ips_chart"></canvas>
+          </div>
+        </div>
+      </div>
     </div>
-    <div>
-      <h1>Top X de dispositivos más vulnerables</h1>
-      <form action="/devices" method="post">
-        <label for="x">Número de elementos:</label>
-        <input type="text" name="nDevices" id="nDevices">
-        <input type="submit" value="Generar gráfico">
-      </form>
-    </div>
+    <script>
+      var chart;
 
+      function updateTopIps(n_ips) {
+        axios.get('/top_ips', {
+          params: {
+            n_ips: n_ips
+          }
+        }).then(function(response) {
+          chart.data.labels = response.data.top_ips.map(function(ip) {
+            return ip.origen;
+          });
+          chart.data.datasets[0].data = response.data.top_ips.map(function(ip) {
+            return ip.count;
+          });
+          chart.update();
+        }).catch(function(error) {
+          console.log(error);
+        });
+      }
+
+      function updateLatestCVEs() {
+        axios.get('/latest_cves').then(function(response) {
+          var cveList = response.data.cves.map(function(cve) {
+            var cveLink = 'https://cve.mitre.org/cgi-bin/cvename.cgi?name=' + cve.id;
+            return ' <li> <a target = "_blank" href = "' + cveLink + '" > ' + cve.id + ' </a> </li>';
+          });
+          document.getElementById('latest_cves_list').innerHTML = cveList.join('');
+        }).catch(function(error) {
+          console.log(error);
+        });
+      }
+      var slider = document.getElementById('num_ips');
+      var output = document.getElementById('num_ips_val');
+      slider.addEventListener('input', function(e) {
+        output.textContent = e.target.value;
+        updateTopIps(e.target.value);
+      });
+      setInterval(function() {
+        var n_ips = slider.value;
+        updateTopIps(n_ips);
+        updateLatestCVEs();
+      }, 30000); //5 mins
+
+      axios.get('/top_ips').then(function(response) {
+        var ctx = document.getElementById('top_ips_chart').getContext('2d');
+        chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: response.data.top_ips.map(function(ip) {
+              return ip.origen;
+            }),
+            datasets: [{
+              label: 'Top IPs',
+              data: response.data.top_ips.map(function(ip) {
+                return ip.count;
+              }),
+              backgroundColor: 'rgba(75, 192, 192, 0.2)',
+              borderColor: 'rgba(75, 192, 192, 1)',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+      }).catch(function(error) {
+        console.log(error);
+      });
+      updateLatestCVEs()
+    </script>
   </body>
 </html>
