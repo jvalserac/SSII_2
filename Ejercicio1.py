@@ -1,12 +1,11 @@
 import base64
 import sqlite3
 import matplotlib.pyplot as plt
-import io
+from matplotlib.table import Table
+from io import BytesIO
 import pandas as pd
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, make_response
 import requests
-
-
 
 app = Flask(__name__)
 con = sqlite3.connect('database.db', check_same_thread=False)
@@ -63,6 +62,57 @@ def latest_cves():
         return jsonify(cves=cves_data)
     else:
         return jsonify(error='Error al conseguir datos de https://cve.circl.lu/api/last')
+
+@app.route('/download_pdf', methods=['POST'])
+def download_pdf():
+    # Convert the incoming JSON data to DataFrames
+    top_ips_data = request.json['top_ips']
+    top_ips = pd.DataFrame(top_ips_data['datasets'][0]['data'], index=top_ips_data['labels'], columns=['Top IPs'])
+
+    top_devices_data = request.json['top_devices']
+    top_devices = pd.DataFrame(top_devices_data['datasets'][0]['data'], index=top_devices_data['labels'], columns=['Top Devices'])
+
+    cves_data = request.json['cves']
+    cves = pd.DataFrame(cves_data)
+
+    # Create a figure to hold the plot elements
+    fig, axs = plt.subplots(3, 1, figsize=(8, 12))
+
+    # Top IPs plot
+    top_ips.plot(kind='barh', ax=axs[0])
+    axs[0].set_title('Top IPs')
+
+    # Top Devices plot
+    top_devices.plot(kind='barh', ax=axs[1])
+    axs[1].set_title('Top Devices')
+
+    # CVEs list as a table
+    axs[2].axis('tight')
+    axs[2].axis('off')
+    table = Table(axs[2], bbox=[0,0,1,1])
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.add_cell(0, 0, width=1, height=0.1, text="CVEs", 
+                   fill=False, loc='center', 
+                   facecolor='none')
+    for i, cve in enumerate(cves['id']):
+        table.add_cell(i+1, 0, width=1, height=0.1, text=cve, 
+                       fill=False, loc='left', 
+                       facecolor='none')
+    axs[2].add_table(table)
+
+    # Save the figure to a BytesIO object
+    pdf_io = BytesIO()
+    fig.savefig(pdf_io, format='pdf', bbox_inches='tight')
+
+    # Send the BytesIO as a file download
+    response = make_response(pdf_io.getvalue())
+    response.headers['Content-Disposition'] = 'attachment; filename=report.pdf'
+    response.mimetype = 'application/pdf'
+
+    return response
+
+
 
 
 if __name__ == '__main__':
