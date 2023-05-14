@@ -1,11 +1,17 @@
 import base64
+import json
 import sqlite3
+from io import BytesIO
+
 import matplotlib.pyplot as plt
 from matplotlib.table import Table
-from io import BytesIO
 import pandas as pd
 from flask import Flask, jsonify, render_template, request, make_response
 import requests
+from sklearn import linear_model
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, mean_squared_error
 
 app = Flask(__name__)
 con = sqlite3.connect('database.db', check_same_thread=False)
@@ -46,6 +52,49 @@ def top_devices():
 
     return jsonify(top_devices=top_devices_dict)
 
+@app.route('/linear_regression', methods=['GET'])
+def linear_regression():
+    with open('./data/devices_IA_clases.json', 'r') as file:
+        train = json.load(file)
+
+    with open('./data/devices_IA_predecir_v2.json', 'r') as file:
+        predict = json.load(file)
+
+    x_train = []
+    y_train = []
+    x_predict = []
+    y_predict = []
+
+    # Train data
+    for i in train:
+        x_train.append([i['servicios_inseguros']])
+        y_train.append(i['peligroso'])
+
+    # Testing data
+    for i in predict:
+        x_predict.append([i['servicios_inseguros']])
+        y_predict.append(i['peligroso'])
+
+    regresion = linear_model.LinearRegression()
+    regresion.fit(x_train, y_train)
+    prediction = regresion.predict(x_predict)
+
+    mse = mean_squared_error(prediction, y_predict)
+    print(f"Mean squared error: {mse:.2f}")
+
+    x = [i[0] for i in x_predict]
+    y = y_predict
+    y_pred = prediction.tolist()
+
+    data = {
+        'x': x,
+        'y': y,
+        'y_pred': y_pred,
+        'mse': mse
+    }
+
+    return jsonify(data)
+
 
 @app.route('/latest_cves', methods=['GET'])
 def latest_cves():
@@ -65,7 +114,6 @@ def latest_cves():
 
 @app.route('/download_pdf', methods=['POST'])
 def download_pdf():
-    # Convert the incoming JSON data to DataFrames
     top_ips_data = request.json['top_ips']
     top_ips = pd.DataFrame(top_ips_data['datasets'][0]['data'], index=top_ips_data['labels'], columns=['Top IPs'])
 
@@ -75,8 +123,11 @@ def download_pdf():
     cves_data = request.json['cves']
     cves = pd.DataFrame(cves_data)
 
-    # Create a figure to hold the plot elements
-    fig, axs = plt.subplots(3, 1, figsize=(8, 12))
+    # New: Linear Regression Data
+    linear_reg_data = request.json['linear_regression']
+    linear_reg = pd.DataFrame(linear_reg_data, columns=['x', 'y'])
+
+    fig, axs = plt.subplots(4, 1, figsize=(8, 16))
 
     # Top IPs plot
     top_ips.plot(kind='barh', ax=axs[0])
@@ -86,10 +137,15 @@ def download_pdf():
     top_devices.plot(kind='barh', ax=axs[1])
     axs[1].set_title('Top Devices')
 
-    # CVEs list as a table
-    axs[2].axis('tight')
-    axs[2].axis('off')
-    table = Table(axs[2], bbox=[0,0,1,1])
+    # Linear Regression plot
+    axs[2].scatter(linear_reg['x'], linear_reg['y'], color='blue')
+    axs[2].plot(linear_reg['x'], linear_reg['y_pred'], color='red')
+    axs[2].set_title('Linear Regression')
+
+    # CVEs list table
+    axs[3].axis('tight')
+    axs[3].axis('off')
+    table = Table(axs[3], bbox=[0,0,1,1])
     table.auto_set_font_size(False)
     table.set_fontsize(10)
     table.add_cell(0, 0, width=1, height=0.1, text="CVEs", 
@@ -99,20 +155,16 @@ def download_pdf():
         table.add_cell(i+1, 0, width=1, height=0.1, text=cve, 
                        fill=False, loc='left', 
                        facecolor='none')
-    axs[2].add_table(table)
-
-    # Save the figure to a BytesIO object
+    axs[3].add_table(table)
     pdf_io = BytesIO()
     fig.savefig(pdf_io, format='pdf', bbox_inches='tight')
-
-    # Send the BytesIO as a file download
+    pdf_io.seek(0)
+    
     response = make_response(pdf_io.getvalue())
-    response.headers['Content-Disposition'] = 'attachment; filename=report.pdf'
-    response.mimetype = 'application/pdf'
-
+    response.headers.set('Content-Type', 'application/pdf')
+    response.headers.set('Content-Disposition', 'attachment', filename='report.pdf')
+    
     return response
-
-
 
 
 if __name__ == '__main__':
