@@ -1,21 +1,21 @@
 import base64
 import json
 import sqlite3
+import requests
+import pandas as pd
 from io import BytesIO
 
 import matplotlib.pyplot as plt
 from matplotlib.table import Table
-import pandas as pd
-from flask import Flask, jsonify, render_template, request, make_response
-import requests
-from sklearn import linear_model
+
+from flask import Flask, jsonify, render_template, request, make_response, send_file
+from sklearn import linear_model, tree
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, mean_squared_error
+from sklearn.metrics import mean_squared_error
+
 
 app = Flask(__name__)
 con = sqlite3.connect('database.db', check_same_thread=False)
-
 
 @app.route('/')
 def formulario():
@@ -95,6 +95,45 @@ def linear_regression():
 
     return jsonify(data)
 
+@app.route('/decision_tree', methods=['GET'])
+def decision_tree():
+    file = open('./data/devices_IA_clases.json')
+    train = json.load(file)
+    file = open('./data/devices_IA_predecir_v2.json')
+    test = json.load(file)
+    x_train = []
+    y_train = []
+    x_test = []
+    y_test = []
+
+    # Getting data to train
+    for i in train:
+        if i['servicios'] != 0:
+            x_train.append([i['servicios_inseguros'] / i['servicios']])
+        else:
+            x_train.append([0])
+        y_train.append(i['peligroso'])
+
+    # Getting data to test
+    for i in test:
+        if i['servicios'] != 0:
+            x_test.append([i['servicios_inseguros'] / i['servicios']])
+        else:
+            x_test.append([0])
+        y_test.append(i['peligroso'])
+
+    decisionTree = tree.DecisionTreeClassifier()
+    decisionTree.fit(x_train, y_train)
+    
+    fig, ax = plt.subplots(figsize=(8, 8))
+    tree.plot_tree(decisionTree, filled=True, feature_names=["servicios_inseguros/servicios"], fontsize=7, class_names=["no peligroso", "peligroso"])
+    ax.set_axis_off()
+
+    image_data = BytesIO()
+    plt.savefig(image_data, format='png')
+    image_data.seek(0)
+
+    return send_file(image_data, mimetype='image/png')
 
 @app.route('/latest_cves', methods=['GET'])
 def latest_cves():
@@ -123,11 +162,7 @@ def download_pdf():
     cves_data = request.json['cves']
     cves = pd.DataFrame(cves_data)
 
-    # New: Linear Regression Data
-    linear_reg_data = request.json['linear_regression']
-    linear_reg = pd.DataFrame(linear_reg_data, columns=['x', 'y'])
-
-    fig, axs = plt.subplots(4, 1, figsize=(8, 16))
+    fig, axs = plt.subplots(3, 1, figsize=(8, 16))
 
     # Top IPs plot
     top_ips.plot(kind='barh', ax=axs[0])
@@ -137,36 +172,32 @@ def download_pdf():
     top_devices.plot(kind='barh', ax=axs[1])
     axs[1].set_title('Top Devices')
 
-    # Linear Regression plot
-    axs[2].scatter(linear_reg['x'], linear_reg['y'], color='blue')
-    axs[2].plot(linear_reg['x'], linear_reg['y_pred'], color='red')
-    axs[2].set_title('Linear Regression')
-
     # CVEs list table
-    axs[3].axis('tight')
-    axs[3].axis('off')
-    table = Table(axs[3], bbox=[0,0,1,1])
+    table = Table(axs[2], bbox=[0, 0, 1, 1])
     table.auto_set_font_size(False)
     table.set_fontsize(10)
-    table.add_cell(0, 0, width=1, height=0.1, text="CVEs", 
-                   fill=False, loc='center', 
+    table.add_cell(0, 0, width=1, height=0.1, text="CVEs",
+                   fill=False, loc='center',
                    facecolor='none')
     for i, cve in enumerate(cves['id']):
-        table.add_cell(i+1, 0, width=1, height=0.1, text=cve, 
-                       fill=False, loc='left', 
+        table.add_cell(i + 1, 0, width=1, height=0.1, text=cve,
+                       fill=False, loc='center',
                        facecolor='none')
-    axs[3].add_table(table)
+    axs[2].get_xaxis().set_visible(False)
+    axs[2].get_yaxis().set_visible(False)
+
+    axs[2].add_table(table)
+
     pdf_io = BytesIO()
     fig.savefig(pdf_io, format='pdf', bbox_inches='tight')
     pdf_io.seek(0)
-    
+
     response = make_response(pdf_io.getvalue())
     response.headers.set('Content-Type', 'application/pdf')
     response.headers.set('Content-Disposition', 'attachment', filename='report.pdf')
-    
+
     return response
 
 
 if __name__ == '__main__':
     app.run(debug=True)
-
