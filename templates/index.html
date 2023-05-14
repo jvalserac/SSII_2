@@ -54,10 +54,58 @@
           </div>
         </div>
       </div>
+      <div class="bg-white rounded-lg shadow p-5">
+        <h2 class="text-2xl mb-4 text-gray-700">Árboles de decisión "Random Forest"</h2>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {% for tree_index in range(12) %}
+            <div class="bg-white rounded-lg shadow p-5">
+            <img src="/decision_tree/{{ tree_index }}" id="img_decision_{{ tree_index }}" class="cursor-pointer" onclick="enlargeImage('{{ tree_index }}')">
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div id="imageModal" class="fixed top-0 left-0 right-0 bottom-0 flex items-center justify-center bg-black bg-opacity-75 hidden">
+        <div id="modalContent" class="bg-white rounded-lg shadow p-5">
+          <img id="enlargedImage" src="" alt="" class="max-w-full max-h-full">
+        </div>
+      </div>
     </div>
 
-    
+    <style type="text/css">
+      #imageModal {
+        z-index: 9999;
+      }
+
+      #modalContent {
+        max-width: 90vw;
+        max-height: 90vh;
+      }
+
+      #enlargedImage {
+        display: block;
+        margin: 0 auto;
+      }
+
+    </style>
+
     <script>
+
+      function enlargeImage(treeIndex) {
+        const modal = document.getElementById('imageModal');
+        const modalContent = document.getElementById('modalContent');
+        const enlargedImage = document.getElementById('enlargedImage');
+
+        enlargedImage.src = '/decision_tree/' + treeIndex;
+
+        modal.classList.remove('hidden');
+
+        modal.addEventListener('click', function(event) {
+          if (event.target === modal) {
+            modal.classList.add('hidden');
+          }
+        });
+      }
+
       var ipsChart;
       var devicesChart;
       var linearRegChart;

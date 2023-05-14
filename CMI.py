@@ -12,7 +12,10 @@ from flask import Flask, jsonify, render_template, request, make_response, send_
 from sklearn import linear_model, tree
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
+from sklearn.ensemble import RandomForestClassifier
+import matplotlib
 
+matplotlib.use('agg')
 
 app = Flask(__name__)
 con = sqlite3.connect('database.db', check_same_thread=False)
@@ -51,6 +54,50 @@ def top_devices():
     top_devices_dict = {'ip': top_devices['ip'].tolist(), 'suma_vuln': top_devices['suma_vuln'].tolist()}
 
     return jsonify(top_devices=top_devices_dict)
+
+@app.route('/decision_tree/<int:tree_index>', methods=['GET'])
+def forest(tree_index):
+    file = open('./data/devices_IA_clases.json')
+    train = json.load(file)
+    file = open('./data/devices_IA_predecir_v2.json')
+    test = json.load(file)
+    x_train = []
+    y_train = []
+    x_test = []
+    y_test = []
+
+    # Getting data to train
+    for i in train:
+        if i['servicios'] != 0:
+            x_train.append([i['servicios_inseguros'] / i['servicios']])
+        else:
+            x_train.append([0])
+        y_train.append(i['peligroso'])
+
+    # Getting data to test
+    for i in test:
+        if i['servicios'] != 0:
+            x_test.append([i['servicios_inseguros'] / i['servicios']])
+        else:
+            x_test.append([0])
+        y_test.append(i['peligroso'])
+
+    randomForest = RandomForestClassifier(max_depth=3, random_state=0, n_estimators=12)
+    randomForest.fit(x_train, y_train)
+    print(len(randomForest.estimators_))
+
+
+    decisionTree = randomForest.estimators_[tree_index]
+    fig, ax = plt.subplots(figsize=(8, 8))
+    tree.plot_tree(decisionTree, filled=True, feature_names=["servicios_inseguros/servicios"], fontsize=7, class_names=["no peligroso", "peligroso"])
+    ax.set_axis_off()
+
+    image_data = BytesIO()
+    plt.savefig(image_data, format='png')
+    plt.close()
+    image_data.seek(0)
+
+    return send_file(image_data, mimetype='image/png')
 
 @app.route('/linear_regression', methods=['GET'])
 def linear_regression():
