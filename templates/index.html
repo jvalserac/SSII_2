@@ -20,10 +20,10 @@
             <h2 class="text-2xl mb-4 text-gray-700">Últimos CVEs</h2>
             <ul id="latest_cves_list" class="list-disc list-inside truncate"></ul>
           </div>
-          <div class="bg-white rounded-lg shadow p-5">
-            <h2 class="text-2xl mb-4 text-gray-700">Arbol de decisión</h2>
-            <img class="object-fill " src="/decision_tree" id="img_decision">
-          </div>
+        <div class="bg-white rounded-lg shadow p-5">
+          <h2 class="text-2xl mb-4 text-gray-700">Arbol de decisión</h2>
+          <img class="object-fill cursor-pointer" src="/decision_tree" id="img_decision" onclick="enlargeImage('main')">
+        </div>
         </div>
         <div class="w-full lg:w-3/5 mb-4">
           <div class="bg-white rounded-lg shadow p-5 mb-6">
@@ -95,7 +95,11 @@
         const modalContent = document.getElementById('modalContent');
         const enlargedImage = document.getElementById('enlargedImage');
 
-        enlargedImage.src = '/decision_tree/' + treeIndex;
+        if (treeIndex === 'main') {
+          enlargedImage.src = '/decision_tree';
+        } else {
+          enlargedImage.src = '/decision_tree/' + treeIndex;
+        }
 
         modal.classList.remove('hidden');
 
