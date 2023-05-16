@@ -55,6 +55,37 @@ def top_devices():
 
     return jsonify(top_devices=top_devices_dict)
 
+@app.route('/top_peligrosos', methods=['GET'])
+def top_peligrosos():
+    peligro = str(request.args.get('peligro', 'true'))
+    if peligro == 'true':
+        peligro = True
+    elif peligro == 'false':
+        peligro = False
+
+    top = int(request.args.get('n_devices', 5))
+    
+    con = sqlite3.connect('database.db')
+    devices = pd.read_sql_query("SELECT * FROM dispositivos", con)
+    analysis = pd.read_sql_query("SELECT * FROM analisis", con)
+    merged = pd.merge(devices, analysis, on='ip')
+    merged['ratio'] = merged['servicios_inseguros'] / merged['servicios']
+    merged['ratio'].fillna(0, inplace=True)
+    
+    if peligro:
+        sorted_devices = merged[merged['ratio'] > 0.33].sort_values(by='ratio', ascending=False)
+    else:
+        sorted_devices = merged[merged['ratio'] < 0.33].sort_values(by='ratio', ascending=True)
+        sorted_devices['ratio'] = 1 - sorted_devices['ratio'] # Ratio servicios seguros es (1 - ratio inseguros)
+
+    top_devices = sorted_devices.head(top)
+    top_devices = top_devices[['ip', 'ratio']]
+    con.close()
+
+    top_devices_dict = {'ip': top_devices['ip'].tolist(), 'ratio': top_devices['ratio'].tolist()}
+
+    return jsonify(top_devices=top_devices_dict)
+
 @app.route('/decision_tree/<int:tree_index>', methods=['GET'])
 def forest(tree_index):
     file = open('./data/devices_IA_clases.json')

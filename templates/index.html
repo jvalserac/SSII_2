@@ -16,20 +16,20 @@
       </div>
       <div class="flex flex-wrap lg:flex-nowrap">
         <div class="w-full lg:w-2/5 lg:mr-5 mb-4">
-          <div class="bg-white rounded-lg shadow p-5 mb-4">
+          <div class="bg-white rounded-lg shadow p-5 mb-10">
             <h2 class="text-2xl mb-4 text-gray-700">Últimos CVEs</h2>
-            <ul id="latest_cves_list" class="list-disc list-inside truncate"></ul>
+            <ul id="latest_cves_list" class="text-lg mb-4 text-black font-semibold list-disc list-inside truncate"></ul>
           </div>
-        <div class="bg-white rounded-lg shadow p-5">
+        <div class="bg-white mt-10 rounded-lg shadow p-5">
           <h2 class="text-2xl mb-4 text-gray-700">Arbol de decisión</h2>
-          <img class="object-fill cursor-pointer" src="/decision_tree" id="img_decision" onclick="enlargeImage('main')">
+          <img class="object-fill cursor-pointer mb-4" src="/decision_tree" id="img_decision" onclick="enlargeImage('main')">
         </div>
         </div>
         <div class="w-full lg:w-3/5 mb-4">
           <div class="bg-white rounded-lg shadow p-5 mb-6">
             <h2 class="text-2xl mb-4 text-gray-700">Top IPs</h2>
             <div class="my-4">
-              <label for="num_ips" class="block text-gray-700 text-sm font-bold mb-2">Número de IPs a mostrar: <span id="num_ips_val">5</span>
+              <label for="num_ips" class="block text-gray-700 text-base font-bold mb-2">Número de IPs a mostrar: <span id="num_ips_val">5</span>
               </label>
               <input type="range" id="num_ips" name="num_ips" min="1" max="10" value="5" class="slider bg-gray-300 appearance-none h-3 rounded-full w-full overflow-hidden cursor-pointer">
             </div>
@@ -41,16 +41,31 @@
           </div>
         </div>
       </div>
-      <div class="flex flex-wrap lg:flex-nowrap">
-        <div class="w-full lg:mr-5 mb-4">
+      <div class="flex mt-4 flex-wrap lg:flex-nowrap">
+        <div class="w-full lg:w-1/2 lg:mr-5 mb-4">
           <div class="bg-white rounded-lg shadow p-5">
             <h2 class="text-2xl mb-4 text-gray-700">Top Dispositivos</h2>
             <div class="my-4">
-              <label for="num_devices" class="block text-gray-700 text-sm font-bold mb-2">Número de dispositivos a mostrar: <span id="num_devices_val">5</span>
+              <label for="num_devices" class="block text-gray-700 text-base font-bold mb-2">Número de dispositivos a mostrar: <span id="num_devices_val">5</span>
               </label>
               <input type="range" id="num_devices" name="num_devices" min="1" max="10" value="5" class="slider bg-gray-300 appearance-none h-3 rounded-full w-full overflow-hidden cursor-pointer">
             </div>
             <canvas id="top_devices_chart"></canvas>
+          </div>
+        </div>
+        <div class="w-full lg:w-1/2 lg:mr-5 mb-4">
+          <div class="bg-white rounded-lg shadow p-5">
+            <h2 class="text-2xl mb-4 text-gray-700">Top Peligrosos</h2>
+            <div class="my-4 ">
+              <label for="num_dangerous_devices" class="block text-gray-700 text-base font-bold mb-2">Número de dispositivos a mostrar: <span id="num_dangerous_devices_val">2</span>
+              </label>
+              <div class="flex items-center">
+                <label for="peligro" class="mr-4 block text-gray-700 text-base font-bold mb-2">Tick marcado > 33% | No marcado < 33%</label>
+                <input type="checkbox" id="peligro" name="peligro" class="mb-1.5 form-checkbox h-4 w-4 text-blue-600" checked>
+              </div>
+              <input type="range" id="num_dangerous_devices" name="num_dangerous_devices" min="1" max="3" value="2" class="slider bg-gray-300 appearance-none h-3 rounded-full w-full overflow-hidden cursor-pointer">
+            </div>
+            <canvas id="top_dangerous_devices_chart"></canvas>
           </div>
         </div>
       </div>
@@ -113,6 +128,22 @@
       var ipsChart;
       var devicesChart;
       var linearRegChart;
+      var dangerousDevicesChart;
+
+      function updateTopPeligrosos(n_devices, peligro) {
+        axios.get('/top_peligrosos', {
+          params: {
+            n_devices: n_devices,
+            peligro: peligro
+          }
+        }).then(function(response) {
+          dangerousDevicesChart.data.labels = response.data.top_devices.ip;
+          dangerousDevicesChart.data.datasets[0].data = response.data.top_devices.ratio;
+          dangerousDevicesChart.update();
+        }).catch(function(error) {
+          console.log(error);
+        });
+      }
 
       function updateTopIps(n_ips) {
         axios.get('/top_ips', {
@@ -150,7 +181,7 @@
         axios.get('/latest_cves').then(function(response) {
           var cveList = response.data.cves.map(function(cve) {
             var cveLink = 'https://cve.mitre.org/cgi-bin/cvename.cgi?name=' + cve.id;
-            return ' <li> <a target = "_blank" href = "' + cveLink + '" > ' + cve.id + ' </a> </li>';
+            return ' <li mb-3> <a target = "_blank" href = "' + cveLink + '" > ' + cve.id + ' </a> </li>';
           });
           document.getElementById('latest_cves_list').innerHTML = cveList.join('');
         }).catch(function(error) {
@@ -179,6 +210,28 @@
       var devicesSlider = document.getElementById('num_devices');
       var devicesOutput = document.getElementById('num_devices_val');
 
+      var dangerousDevicesSlider = document.getElementById('num_dangerous_devices');
+      var dangerousDevicesOutput = document.getElementById('num_dangerous_devices_val');
+      var peligroCheckbox = document.getElementById('peligro');
+
+      dangerousDevicesSlider.addEventListener('input', function(e) {
+        var peligro = peligroCheckbox.checked;
+        dangerousDevicesOutput.textContent = e.target.value;
+        updateTopPeligrosos(e.target.value, peligro);
+      });
+
+      peligroCheckbox.addEventListener('change', function(e) {
+        var n_devices = dangerousDevicesSlider.value;
+        var peligro = e.target.checked;
+        updateTopPeligrosos(n_devices, peligro);
+      });
+
+      devicesSlider.addEventListener('input', function(e) {
+        devicesOutput.textContent = e.target.value;
+        var peligro = peligroCheckbox.checked;
+        updateTopDevices(e.target.value, peligro);
+      });
+
       ipsSlider.addEventListener('input', function(e) {
         ipsOutput.textContent = e.target.value;
         updateTopIps(e.target.value);
@@ -192,8 +245,11 @@
       setInterval(function() {
         var n_ips = ipsSlider.value;
         var n_devices = devicesSlider.value;
+        var n_dangerous_devices = dangerousDevicesSlider.value;
+        var peligro = peligroCheckbox.checked;
         updateTopIps(n_ips);
         updateTopDevices(n_devices);
+        updateTopPeligrosos(n_dangerous_devices, peligro);
         updateLinearRegression();
         updateLatestCVEs();
       }, 30000); //Actualizamos gráficos cada 5 mins
@@ -293,6 +349,37 @@
             console.log(error);
       });
 
+      axios.get('/top_peligrosos', {
+        params: {
+          n_devices: dangerousDevicesSlider.value,
+          peligro: true
+        }
+      }).then(function(response) {
+        var dangerousDevicesCtx = document.getElementById('top_dangerous_devices_chart').getContext('2d');
+        dangerousDevicesChart = new Chart(dangerousDevicesCtx, {
+          type: 'bar',
+          data: {
+            labels: response.data.top_devices.ip,
+            datasets: [{
+              label: 'Ratio',
+              data: response.data.top_devices.ratio,
+              backgroundColor: 'rgba(255, 99, 132, 0.2)',
+              borderColor: 'rgba(255, 99, 132, 1)',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+      }).catch(function(error) {
+        console.log(error);
+      });
+
       document.getElementById('download_pdf').addEventListener('click', function() {
         axios.get('/latest_cves').then(function(cveResponse) {
             axios({
@@ -312,14 +399,16 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-            }).catch(function(error) {
-                console.log(error);
-            });
-        }).catch(function(error) {
-            console.log(error);
-        });
-    });
+              }).catch(function(error) {
+                  console.log(error);
+              });
+          }).catch(function(error) {
+              console.log(error);
+          });
+      });
+
       updateLatestCVEs()
+
     </script>
   </body>
 </html>
